@@ -1,0 +1,1337 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Started on 2010-11-07 20:42:53 BOT
+
+SET statement_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = off;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET escape_string_warning = off;
+
+--
+-- TOC entry 337 (class 2612 OID 23524)
+-- Name: plpgsql; Type: PROCEDURAL LANGUAGE; Schema: -; Owner: postgres
+--
+
+CREATE PROCEDURAL LANGUAGE plpgsql;
+
+
+ALTER PROCEDURAL LANGUAGE plpgsql OWNER TO postgres;
+
+SET search_path = public, pg_catalog;
+
+--
+-- TOC entry 19 (class 1255 OID 23525)
+-- Dependencies: 337 6
+-- Name: act_saldoproyecto(bigint, bigint, character varying, numeric, numeric, numeric, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION act_saldoproyecto(cuenta_id_p bigint, proyecto_id_p bigint, codmoneda_p character varying, dbmn_p numeric, crmn_p numeric, dbmo_p numeric, crmo_p numeric) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+
+declare
+saldoproyecto_r saldoproyecto%ROWTYPE;
+detsaldoproyecto_r detsaldoproyecto%ROWTYPE;
+
+begin
+
+    select * into saldoproyecto_r
+      from saldoproyecto
+      where cuenta_id = cuenta_id_p
+        and proyecto_id = proyecto_id_p;
+    if FOUND then
+      update saldoproyecto
+        set dbmn = dbmn + dbmn_p,
+	    crmn = crmn + crmn_p
+      where cuenta_id = cuenta_id_p
+        and proyecto_id = proyecto_id_p;
+    else
+      insert into saldoproyecto(cuenta_id, proyecto_id, dbmn, crmn, saldoinimn)
+        values(cuenta_id_p, proyecto_id_p, dbmn_p, crmn_p, 0)
+        returning * into saldoproyecto_r;
+    end if;
+
+    select * into detsaldoproyecto_r
+      from detsaldoproyecto
+      where saldoproyecto_id = saldoproyecto_r.id
+        and codmoneda = codmoneda_p;
+    if FOUND then
+      update detsaldoproyecto
+        set dbmo = dbmo + dbmo_p,
+	    crmo = crmo + crmo_p,
+	    dbmn = dbmn + dbmn_p,
+	    crmn = crmn + crmn_p
+        where saldoproyecto_id = saldoproyecto_r.id
+          and codmoneda = codmoneda_p;
+    else
+      insert into detsaldoproyecto(saldoproyecto_id, codmoneda, dbmo, crmo, saldoinimo, dbmn, crmn, saldoinimn)
+        values(saldoproyecto_r.id, codmoneda_p, dbmo_p, crmo_p, 0, dbmn_p, crmn_p, 0);
+    end if;
+  
+end
+
+$$;
+
+
+ALTER FUNCTION public.act_saldoproyecto(cuenta_id_p bigint, proyecto_id_p bigint, codmoneda_p character varying, dbmn_p numeric, crmn_p numeric, dbmo_p numeric, crmo_p numeric) OWNER TO postgres;
+
+--
+-- TOC entry 20 (class 1255 OID 23526)
+-- Dependencies: 337 6
+-- Name: act_saldounidad(bigint, bigint, character varying, numeric, numeric, numeric, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION act_saldounidad(cuenta_id_p bigint, unidad_id_p bigint, codmoneda_p character varying, dbmn_p numeric, crmn_p numeric, dbmo_p numeric, crmo_p numeric) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+
+declare
+saldounidad_r saldounidad%ROWTYPE;
+detsaldounidad_r detsaldounidad%ROWTYPE;
+
+begin
+
+    select * into saldounidad_r
+      from saldounidad
+      where cuenta_id = cuenta_id_p
+        and unidad_id = unidad_id_p;
+    if FOUND then
+      update saldounidad
+        set dbmn = dbmn + dbmn_p,
+	    crmn = crmn + crmn_p
+      where cuenta_id = cuenta_id_p
+        and unidad_id = unidad_id_p;
+    else
+      insert into saldounidad(cuenta_id, unidad_id, dbmn, crmn, saldoinimn)
+        values(cuenta_id_p, unidad_id_p, dbmn_p, crmn_p, 0)
+        returning * into saldounidad_r;
+    end if;
+
+    select * into detsaldounidad_r
+      from detsaldounidad
+      where saldounidad_id = saldounidad_r.id
+        and codmoneda = codmoneda_p;
+    if FOUND then
+      update detsaldounidad
+        set dbmo = dbmo + dbmo_p,
+	    crmo = crmo + crmo_p,
+	    dbmn = dbmn + dbmn_p,
+	    crmn = crmn + crmn_p
+        where saldounidad_id = saldounidad_r.id
+          and codmoneda = codmoneda_p;
+    else
+      insert into detsaldounidad(saldounidad_id, codmoneda, dbmo, crmo, saldoinimo, dbmn, crmn, saldoinimn)
+        values(saldounidad_r.id, codmoneda_p, dbmo_p, crmo_p, 0, dbmn_p, crmn_p, 0);
+    end if;
+  
+end
+
+$$;
+
+
+ALTER FUNCTION public.act_saldounidad(cuenta_id_p bigint, unidad_id_p bigint, codmoneda_p character varying, dbmn_p numeric, crmn_p numeric, dbmo_p numeric, crmo_p numeric) OWNER TO postgres;
+
+--
+-- TOC entry 21 (class 1255 OID 23527)
+-- Dependencies: 337 6
+-- Name: pu_comprobante(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION pu_comprobante() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+
+declare
+rengloncomprobante_r rengloncomprobante%ROWTYPE;
+dbmn_w saldounidad.dbmn%TYPE;
+crmn_w saldounidad.crmn%TYPE;
+dbmo_w detsaldounidad.dbmo%TYPE;
+crmo_w detsaldounidad.crmo%TYPE;
+cuenta_id_w int8;
+unidad_id_w int8;
+proyecto_id_w int8;
+
+begin
+ if NEW.codedocomprobante <> 'A' or OLD.codedocomprobante = 'A' then
+    return NEW;
+  end if;
+  for rengloncomprobante_r in
+    select * from rengloncomprobante where comprobante_id = NEW.id
+  loop
+    if rengloncomprobante_r.coddebehaber = 'D' then
+      dbmn_w = rengloncomprobante_r.montomn;
+      crmn_w = 0;
+      dbmo_w = rengloncomprobante_r.montomo;
+      crmo_w = 0;
+    else
+      dbmn_w = 0;
+      crmn_w = rengloncomprobante_r.montomn;
+      dbmo_w = 0;
+      crmo_w = rengloncomprobante_r.montomo;
+    end if;
+
+    drop table if exists cuentaNS;
+    create temp table cuentaNS(id int8);
+    cuenta_id_w := rengloncomprobante_r.cuenta_id;
+    while cuenta_id_w > 0 loop
+      insert into cuentaNS values(cuenta_id_w);
+      select cuentapadre_id
+        into cuenta_id_w
+        from cuenta
+        where id = cuenta_id_w;
+    end loop;
+
+    drop table if exists unidadNS;
+    create temp table unidadNS(id int8);
+    unidad_id_w := rengloncomprobante_r.unidad_id;
+    while unidad_id_w > 0 loop
+      insert into unidadNS values(unidad_id_w);
+      select nivelsuperior_id
+        into unidad_id_w
+        from unidad
+        where id = unidad_id_w;
+    end loop;
+
+    drop table if exists proyectoNS;
+    create temp table proyectoNS(id int8);
+    proyecto_id_w := rengloncomprobante_r.proyecto_id;
+    while proyecto_id_w > 0 loop
+      insert into proyectoNS values(proyecto_id_w);
+      select nivelsuperior_id
+        into proyecto_id_w
+        from proyecto
+        where id = proyecto_id_w;
+    end loop;
+
+    for cuenta_id_w in
+      select id from cuentaNS
+    loop
+      for unidad_id_w in
+        select id from unidadNS
+      loop
+        perform act_saldounidad(cuenta_id_w,
+	    		        unidad_id_w,
+			        rengloncomprobante_r.codmoneda,
+			        dbmn_w, crmn_w, dbmo_w, crmo_w);
+      end loop;
+    end loop;
+
+    for cuenta_id_w in
+      select id from cuentaNS
+    loop
+      for proyecto_id_w in
+        select id from proyectoNS
+      loop
+        perform act_saldoproyecto(cuenta_id_w,
+	    		          proyecto_id_w,
+			          rengloncomprobante_r.codmoneda,
+			          dbmn_w, crmn_w, dbmo_w, crmo_w);
+      end loop;
+    end loop;
+  end loop;
+  return NEW;
+  
+end
+
+$$;
+
+
+ALTER FUNCTION public.pu_comprobante() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_with_oids = false;
+
+--
+-- TOC entry 1524 (class 1259 OID 23528)
+-- Dependencies: 1820 1821 1822 1823 6
+-- Name: aplicacion; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE aplicacion (
+    id bigint NOT NULL,
+    nombre character varying(50) DEFAULT ''::character varying NOT NULL,
+    descripcion character varying(250) DEFAULT ''::character varying NOT NULL,
+    ruta character varying(250) DEFAULT ''::character varying NOT NULL,
+    orden bigint DEFAULT 0
+);
+
+
+ALTER TABLE public.aplicacion OWNER TO postgres;
+
+--
+-- TOC entry 1525 (class 1259 OID 23538)
+-- Dependencies: 1524 6
+-- Name: aplicacion_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE aplicacion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.aplicacion_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1901 (class 0 OID 0)
+-- Dependencies: 1525
+-- Name: aplicacion_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE aplicacion_id_seq OWNED BY aplicacion.id;
+
+
+--
+-- TOC entry 1902 (class 0 OID 0)
+-- Dependencies: 1525
+-- Name: aplicacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('aplicacion_id_seq', 3, true);
+
+
+--
+-- TOC entry 1526 (class 1259 OID 23587)
+-- Dependencies: 6
+-- Name: gestion; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE gestion (
+    nrogestion integer NOT NULL,
+    descripcion character varying(64) NOT NULL
+);
+
+
+ALTER TABLE public.gestion OWNER TO postgres;
+
+--
+-- TOC entry 1527 (class 1259 OID 23590)
+-- Dependencies: 6
+-- Name: lugar; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE lugar (
+    id bigint NOT NULL,
+    codigo character varying(32) NOT NULL,
+    nombre character varying(128) NOT NULL,
+    nivelsuperior_id bigint,
+    codaccesooper character varying(8) NOT NULL,
+    nivel smallint NOT NULL,
+    codhabilitacion character varying(8) NOT NULL
+);
+
+
+ALTER TABLE public.lugar OWNER TO postgres;
+
+--
+-- TOC entry 1528 (class 1259 OID 23593)
+-- Dependencies: 1527 6
+-- Name: lugar_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE lugar_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lugar_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1903 (class 0 OID 0)
+-- Dependencies: 1528
+-- Name: lugar_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE lugar_id_seq OWNED BY lugar.id;
+
+
+--
+-- TOC entry 1904 (class 0 OID 0)
+-- Dependencies: 1528
+-- Name: lugar_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('lugar_id_seq', 4, false);
+
+
+--
+-- TOC entry 1529 (class 1259 OID 23610)
+-- Dependencies: 1826 1827 1828 1829 1830 1831 6
+-- Name: opcion; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE opcion (
+    id bigint NOT NULL,
+    nombre character varying(50) DEFAULT ''::character varying NOT NULL,
+    nombrepagina character varying(250) DEFAULT ''::character varying NOT NULL,
+    padre_id bigint DEFAULT 0 NOT NULL,
+    eshoja boolean DEFAULT false NOT NULL,
+    nombreunico character varying(50) DEFAULT ''::character varying NOT NULL,
+    esreescrito boolean DEFAULT false NOT NULL,
+    orden bigint,
+    aplicacion_id bigint
+);
+
+
+ALTER TABLE public.opcion OWNER TO postgres;
+
+--
+-- TOC entry 1530 (class 1259 OID 23619)
+-- Dependencies: 1529 6
+-- Name: opcion_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE opcion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.opcion_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1905 (class 0 OID 0)
+-- Dependencies: 1530
+-- Name: opcion_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE opcion_id_seq OWNED BY opcion.id;
+
+
+--
+-- TOC entry 1906 (class 0 OID 0)
+-- Dependencies: 1530
+-- Name: opcion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('opcion_id_seq', 72, true);
+
+
+--
+-- TOC entry 1531 (class 1259 OID 23621)
+-- Dependencies: 6
+-- Name: opcion_perfil; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE opcion_perfil (
+    perfil_id bigint NOT NULL,
+    opcion_id bigint NOT NULL,
+    aplicacion_id bigint NOT NULL,
+    id bigint NOT NULL
+);
+
+
+ALTER TABLE public.opcion_perfil OWNER TO postgres;
+
+--
+-- TOC entry 1532 (class 1259 OID 23624)
+-- Dependencies: 6 1531
+-- Name: opcion_perfil_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE opcion_perfil_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.opcion_perfil_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1907 (class 0 OID 0)
+-- Dependencies: 1532
+-- Name: opcion_perfil_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE opcion_perfil_id_seq OWNED BY opcion_perfil.id;
+
+
+--
+-- TOC entry 1908 (class 0 OID 0)
+-- Dependencies: 1532
+-- Name: opcion_perfil_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('opcion_perfil_id_seq', 172, true);
+
+
+--
+-- TOC entry 1533 (class 1259 OID 23631)
+-- Dependencies: 1834 1835 6
+-- Name: perfil; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE perfil (
+    id bigint NOT NULL,
+    nombre character varying(50) DEFAULT ''::character varying NOT NULL,
+    descripcion character varying(250) DEFAULT ''::character varying NOT NULL,
+    aplicacion_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.perfil OWNER TO postgres;
+
+--
+-- TOC entry 1534 (class 1259 OID 23636)
+-- Dependencies: 1533 6
+-- Name: perfil_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE perfil_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.perfil_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1909 (class 0 OID 0)
+-- Dependencies: 1534
+-- Name: perfil_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE perfil_id_seq OWNED BY perfil.id;
+
+
+--
+-- TOC entry 1910 (class 0 OID 0)
+-- Dependencies: 1534
+-- Name: perfil_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('perfil_id_seq', 32, true);
+
+
+--
+-- TOC entry 1535 (class 1259 OID 23661)
+-- Dependencies: 6
+-- Name: unidad; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE unidad (
+    id bigint NOT NULL,
+    codigo character varying(32) NOT NULL,
+    nombre character varying(64) NOT NULL,
+    nivelsuperior_id bigint,
+    codaccesooper character varying(8) NOT NULL,
+    nivel smallint NOT NULL,
+    codhabilitacion character varying(8) NOT NULL,
+    lugar_id bigint
+);
+
+
+ALTER TABLE public.unidad OWNER TO postgres;
+
+--
+-- TOC entry 1536 (class 1259 OID 23664)
+-- Dependencies: 6 1535
+-- Name: unidad_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE unidad_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.unidad_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1911 (class 0 OID 0)
+-- Dependencies: 1536
+-- Name: unidad_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE unidad_id_seq OWNED BY unidad.id;
+
+
+--
+-- TOC entry 1912 (class 0 OID 0)
+-- Dependencies: 1536
+-- Name: unidad_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('unidad_id_seq', 6, false);
+
+
+--
+-- TOC entry 1537 (class 1259 OID 23666)
+-- Dependencies: 6
+-- Name: usuario; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE usuario (
+    id bigint NOT NULL,
+    firstname character varying(32),
+    lastname character varying(32),
+    email character varying(48),
+    locale character varying(16),
+    timezone character varying(32),
+    password_pw character varying(48),
+    password_slt character varying(20),
+    textarea character varying(2048),
+    uniqueid character varying(32),
+    validated boolean,
+    superuser boolean,
+    activo boolean,
+    unidad_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.usuario OWNER TO postgres;
+
+--
+-- TOC entry 1538 (class 1259 OID 23672)
+-- Dependencies: 6
+-- Name: usuario_aplicacion_perfil; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE usuario_aplicacion_perfil (
+    usuario_id bigint NOT NULL,
+    perfil_id bigint NOT NULL,
+    aplicacion_id bigint NOT NULL,
+    id bigint NOT NULL
+);
+
+
+ALTER TABLE public.usuario_aplicacion_perfil OWNER TO postgres;
+
+--
+-- TOC entry 1539 (class 1259 OID 23675)
+-- Dependencies: 6 1538
+-- Name: usuario_aplicacion_perfil_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE usuario_aplicacion_perfil_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.usuario_aplicacion_perfil_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1913 (class 0 OID 0)
+-- Dependencies: 1539
+-- Name: usuario_aplicacion_perfil_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE usuario_aplicacion_perfil_id_seq OWNED BY usuario_aplicacion_perfil.id;
+
+
+--
+-- TOC entry 1914 (class 0 OID 0)
+-- Dependencies: 1539
+-- Name: usuario_aplicacion_perfil_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('usuario_aplicacion_perfil_id_seq', 66, true);
+
+
+--
+-- TOC entry 1540 (class 1259 OID 23677)
+-- Dependencies: 6 1537
+-- Name: usuario_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE usuario_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.usuario_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1915 (class 0 OID 0)
+-- Dependencies: 1540
+-- Name: usuario_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE usuario_id_seq OWNED BY usuario.id;
+
+
+--
+-- TOC entry 1916 (class 0 OID 0)
+-- Dependencies: 1540
+-- Name: usuario_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('usuario_id_seq', 49, true);
+
+
+--
+-- TOC entry 1541 (class 1259 OID 23679)
+-- Dependencies: 6
+-- Name: usuario_unidad; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE usuario_unidad (
+    id bigint NOT NULL,
+    unidad_id bigint NOT NULL,
+    usuario_id bigint NOT NULL,
+    funcion character varying(256),
+    motivocambio character varying(256)
+);
+
+
+ALTER TABLE public.usuario_unidad OWNER TO postgres;
+
+--
+-- TOC entry 1542 (class 1259 OID 23685)
+-- Dependencies: 1541 6
+-- Name: usuario_unidad_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE usuario_unidad_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.usuario_unidad_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 1917 (class 0 OID 0)
+-- Dependencies: 1542
+-- Name: usuario_unidad_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE usuario_unidad_id_seq OWNED BY usuario_unidad.id;
+
+
+--
+-- TOC entry 1918 (class 0 OID 0)
+-- Dependencies: 1542
+-- Name: usuario_unidad_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('usuario_unidad_id_seq', 7, true);
+
+
+--
+-- TOC entry 1824 (class 2604 OID 23692)
+-- Dependencies: 1525 1524
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE aplicacion ALTER COLUMN id SET DEFAULT nextval('aplicacion_id_seq'::regclass);
+
+
+--
+-- TOC entry 1825 (class 2604 OID 23700)
+-- Dependencies: 1528 1527
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE lugar ALTER COLUMN id SET DEFAULT nextval('lugar_id_seq'::regclass);
+
+
+--
+-- TOC entry 1832 (class 2604 OID 23701)
+-- Dependencies: 1530 1529
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE opcion ALTER COLUMN id SET DEFAULT nextval('opcion_id_seq'::regclass);
+
+
+--
+-- TOC entry 1833 (class 2604 OID 23702)
+-- Dependencies: 1532 1531
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE opcion_perfil ALTER COLUMN id SET DEFAULT nextval('opcion_perfil_id_seq'::regclass);
+
+
+--
+-- TOC entry 1836 (class 2604 OID 23704)
+-- Dependencies: 1534 1533
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE perfil ALTER COLUMN id SET DEFAULT nextval('perfil_id_seq'::regclass);
+
+
+--
+-- TOC entry 1837 (class 2604 OID 23709)
+-- Dependencies: 1536 1535
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE unidad ALTER COLUMN id SET DEFAULT nextval('unidad_id_seq'::regclass);
+
+
+--
+-- TOC entry 1838 (class 2604 OID 23710)
+-- Dependencies: 1540 1537
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE usuario ALTER COLUMN id SET DEFAULT nextval('usuario_id_seq'::regclass);
+
+
+--
+-- TOC entry 1839 (class 2604 OID 23711)
+-- Dependencies: 1539 1538
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE usuario_aplicacion_perfil ALTER COLUMN id SET DEFAULT nextval('usuario_aplicacion_perfil_id_seq'::regclass);
+
+
+--
+-- TOC entry 1840 (class 2604 OID 23712)
+-- Dependencies: 1542 1541
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE usuario_unidad ALTER COLUMN id SET DEFAULT nextval('usuario_unidad_id_seq'::regclass);
+
+
+--
+-- TOC entry 1886 (class 0 OID 23528)
+-- Dependencies: 1524
+-- Data for Name: aplicacion; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY aplicacion (id, nombre, descripcion, ruta, orden) FROM stdin;
+1	Administración	administracion contable	http://localhost:8080/HeuresisAdmin-web-0.9	1
+2	Operación	Operaciones Contables	http://localhost:8080/HeuresisOper-web-0.9	2
+3	Administración de Seguridad	Adminsitracion de Seguridad	http://localhost:8080/HeuresisAdminS-0.9	3
+\.
+
+
+--
+-- TOC entry 1887 (class 0 OID 23587)
+-- Dependencies: 1526
+-- Data for Name: gestion; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY gestion (nrogestion, descripcion) FROM stdin;
+2010	Enero 2010 - Diciembre 2010
+\.
+
+
+--
+-- TOC entry 1888 (class 0 OID 23590)
+-- Dependencies: 1527
+-- Data for Name: lugar; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY lugar (id, codigo, nombre, nivelsuperior_id, codaccesooper, nivel, codhabilitacion) FROM stdin;
+1	L.LP	Departamento de La Paz	\N	C	1	H
+2	L.CB	Departamento de Cochabamba	\N	C	1	H
+3	L.CB.001	Ciudad de Cochabamba	2	D	2	H
+\.
+
+
+--
+-- TOC entry 1889 (class 0 OID 23610)
+-- Dependencies: 1529
+-- Data for Name: opcion; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY opcion (id, nombre, nombrepagina, padre_id, eshoja, nombreunico, esreescrito, orden, aplicacion_id) FROM stdin;
+51	Asministracion11	Administracion 1.1	49	t	Administracion11	f	1	1
+34	Perfiles	perfil	0	f	Perfiles	t	7	3
+44	Usuarios	usuario	0	t	ListUsuario	t	10	3
+45	Reiniciar Contraseña	reset	0	t	ReiniciarContrasena	t	11	3
+46	Operacion1	Operacion 1	0	t	operacion1	f	1	2
+47	Operacion2	Operacion 2	0	t	operacion2	f	2	2
+50	Administracion2	Administracion 2	0	t	Administracion2	f	2	1
+49	Administracion1	Adminsitracion 1	0	f	Administracion1	f	1	1
+52	Mantenimiento	admin/mantenimiento	0	f	mantenimiento	t	1	1
+53	Reportes	info/reporte	0	f	Reportes	t	2	1
+54	Codigo	admin/codigo	52	t	codigo	t	1	1
+55	Parametro	admin/parametro	52	t	parametro	t	2	1
+56	Moneda	admin/moneda	52	t	moneda	t	3	1
+57	Cuenta	admin/cuenta	52	t	cuenta	t	4	1
+58	Auxiliar	admin/auxiliar	52	t	auxiliar	t	5	1
+59	Unidad	admin/unidad	52	t	unidad	t	6	1
+60	Proyecto	admin/proyecto	52	t	proyecto	t	7	1
+61	Lugares	admin/lugar	52	t	lugar	t	8	1
+62	Plan de Cuentas	info/reporte/plandecuentas	53	t	ReportePlanDeCuentas	t	1	1
+63	Listado de Lugares	info/reporte/listadodelugares	53	t	ReporteListadoDeLugares	t	2	1
+64	Listado de Unidades	info/reporte/listadodeunidades	53	t	ReporteListadoDeUnidades	t	3	1
+65	Listado de Proyectos	info/reporte/listadodeproyectos	53	t	ReporteListadoDeProyectos	t	4	1
+66	Balance General	info/reporte/balancegeneralfiltro	53	t	ReportebalanceGeneral	t	5	1
+67	Estado de Resultados	info/reporte/estadoderesultadosfiltro	53	t	ReporteEstadoDeResultados	t	6	1
+68	Listado de Auxiliares	info/reporte/listadodeauxiliares	53	t	ReporteListadoDeAuxiliares	t	7	1
+70	Mantenimiento	oper/comprobante/list	69	t	ComprobanteList	f	1	2
+71	Pendientes	oper/comprobante/pendientes	69	t	ComprobanteListPendientes	f	2	2
+72	Autorizados	oper/comprobante/autorizados	69	t	ComprobanteListAutorizados	f	3	2
+69	Comprobantes	oper/comprobante	0	f	Comprobante	t	1	2
+\.
+
+
+--
+-- TOC entry 1890 (class 0 OID 23621)
+-- Dependencies: 1531
+-- Data for Name: opcion_perfil; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY opcion_perfil (perfil_id, opcion_id, aplicacion_id, id) FROM stdin;
+6	34	3	106
+1	34	3	107
+1	44	3	108
+1	45	3	109
+2	44	3	110
+30	69	2	111
+30	70	2	112
+30	71	2	113
+30	72	2	114
+31	70	2	115
+31	69	2	116
+32	69	2	169
+32	70	2	170
+32	71	2	171
+32	72	2	172
+\.
+
+
+--
+-- TOC entry 1891 (class 0 OID 23631)
+-- Dependencies: 1533
+-- Data for Name: perfil; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY perfil (id, nombre, descripcion, aplicacion_id) FROM stdin;
+6	Prueba	prueba	3
+19	operacion2	operacion2	2
+21	Adm2	Administracion2	1
+1	administrador		3
+15	Perfil3	de Operacion	2
+2	contador		3
+14	perfil2	perfil'	3
+20	Administrador	Administrador contable	1
+13	operador	operador de comprobantes	2
+30	Operador Completo	Operador Completo	2
+31	Operador Crear	Operador que puede crear comprobantes	2
+32	Operador Autorizar	Operador que puede autorizar comprobantes	2
+\.
+
+
+--
+-- TOC entry 1892 (class 0 OID 23661)
+-- Dependencies: 1535
+-- Data for Name: unidad; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY unidad (id, codigo, nombre, nivelsuperior_id, codaccesooper, nivel, codhabilitacion, lugar_id) FROM stdin;
+0	U.*	Inter-unidades	\N	D	1	H	\N
+1	U.E1	Empresa 1	\N	C	1	H	\N
+2	U.E1.S01	Empresa 1 - Sucursal 1	1	D	2	H	\N
+3	U.E1.S02	Empresa 1 - Sucursal 2	1	D	2	H	\N
+4	U.E2	Empresa 2	\N	C	1	H	\N
+5	U.E2.S01	Empresa 2 - Sucursal 1	4	D	2	H	\N
+\.
+
+
+--
+-- TOC entry 1893 (class 0 OID 23666)
+-- Dependencies: 1537
+-- Data for Name: usuario; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY usuario (id, firstname, lastname, email, locale, timezone, password_pw, password_slt, textarea, uniqueid, validated, superuser, activo, unidad_id) FROM stdin;
+11	Tatiana	Moruno	tatiana.moruno@gmail.com	es_BO	America/La_Paz	y3Z2N2Yh0RMgBb2dHRDgWSFW4gc=	KU53LQXRRYFLJQH0		AYA5CQ1PJT3KT0REU24VJX5HGA5SI2MZ	t	f	t	1
+34	Americo	Vargas	americovargas@gmail.com	es_BO	America/La_Paz	zlENZdUfy7bV3dXZ/x2TuJqbf/o=	GBHCOFTQEYIPOISM		IR45IHI1LSNR423GYQUSEPMIMO0VMJ1Z	t	f	t	2
+20	Andrea	Moruno	andrea@genso.com.bo	es_BO	America/La_Paz	xKrKft8LliWzp11WiCQc0kO3aYc=	KU53LQXRRYFLJQH0		4MWA5BEALQ1NGDMUWKQV4X55FETJIYXU	t	f	t	1
+49	Pepe 	El Operador	pepe@asdf.com	es_BO	America/La_Paz	1a6kzM2AfsdXSRzuYAqJiG7lXQA=	5ST1KTVLVQK5KA3A		BPQ51HS2DAJNXZAV4LITBCRZDBJ1VNKU	t	f	t	2
+33	juan	Olivera	juan@asdf.com	es_BO	America/La_Paz	nT+ALcrIp2xJNNG7+MQdzlz5aX4=	ZIAB0ZCMWKLZDUDI		MOTWOPOACTQ40ER2JQVF5Z0UGOLVBTDI	t	f	t	2
+\.
+
+
+--
+-- TOC entry 1894 (class 0 OID 23672)
+-- Dependencies: 1538
+-- Data for Name: usuario_aplicacion_perfil; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY usuario_aplicacion_perfil (usuario_id, perfil_id, aplicacion_id, id) FROM stdin;
+33	1	3	4
+20	2	3	20
+34	1	3	62
+34	13	2	63
+34	20	1	64
+33	30	2	65
+49	31	2	66
+\.
+
+
+--
+-- TOC entry 1895 (class 0 OID 23679)
+-- Dependencies: 1541
+-- Data for Name: usuario_unidad; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY usuario_unidad (id, unidad_id, usuario_id, funcion, motivocambio) FROM stdin;
+\.
+
+
+--
+-- TOC entry 1842 (class 2606 OID 23715)
+-- Dependencies: 1524 1524
+-- Name: aplicacion_pk; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY aplicacion
+    ADD CONSTRAINT aplicacion_pk PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1852 (class 2606 OID 23719)
+-- Dependencies: 1529 1529
+-- Name: opcion_pk; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY opcion
+    ADD CONSTRAINT opcion_pk PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1848 (class 2606 OID 23743)
+-- Dependencies: 1526 1526
+-- Name: pk_gestion; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY gestion
+    ADD CONSTRAINT pk_gestion PRIMARY KEY (nrogestion);
+
+
+--
+-- TOC entry 1850 (class 2606 OID 23745)
+-- Dependencies: 1527 1527
+-- Name: pk_lugar; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY lugar
+    ADD CONSTRAINT pk_lugar PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1866 (class 2606 OID 23767)
+-- Dependencies: 1535 1535
+-- Name: pk_unidad; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY unidad
+    ADD CONSTRAINT pk_unidad PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1856 (class 2606 OID 23769)
+-- Dependencies: 1531 1531
+-- Name: pkopcion_perfil; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY opcion_perfil
+    ADD CONSTRAINT pkopcion_perfil PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1860 (class 2606 OID 23771)
+-- Dependencies: 1533 1533 1533
+-- Name: pkperfil; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY perfil
+    ADD CONSTRAINT pkperfil PRIMARY KEY (id, aplicacion_id);
+
+
+--
+-- TOC entry 1874 (class 2606 OID 23773)
+-- Dependencies: 1538 1538
+-- Name: pkusuario_aplicacion_perfil; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY usuario_aplicacion_perfil
+    ADD CONSTRAINT pkusuario_aplicacion_perfil PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1862 (class 2606 OID 23775)
+-- Dependencies: 1533 1533
+-- Name: unique_idperfil; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY perfil
+    ADD CONSTRAINT unique_idperfil UNIQUE (id);
+
+
+--
+-- TOC entry 1919 (class 0 OID 0)
+-- Dependencies: 1862
+-- Name: CONSTRAINT unique_idperfil ON perfil; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON CONSTRAINT unique_idperfil ON perfil IS 'unico valor por id de perfil';
+
+
+--
+-- TOC entry 1854 (class 2606 OID 23777)
+-- Dependencies: 1529 1529 1529
+-- Name: unique_nombreunico_aplicacion; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY opcion
+    ADD CONSTRAINT unique_nombreunico_aplicacion UNIQUE (nombreunico, aplicacion_id);
+
+
+--
+-- TOC entry 1864 (class 2606 OID 23779)
+-- Dependencies: 1533 1533 1533
+-- Name: unique_perfil_aplicacion; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY perfil
+    ADD CONSTRAINT unique_perfil_aplicacion UNIQUE (aplicacion_id, nombre);
+
+
+--
+-- TOC entry 1920 (class 0 OID 0)
+-- Dependencies: 1864
+-- Name: CONSTRAINT unique_perfil_aplicacion ON perfil; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON CONSTRAINT unique_perfil_aplicacion ON perfil IS 'Restringir un unico nombre de perfil por aplicacion';
+
+
+--
+-- TOC entry 1844 (class 2606 OID 23781)
+-- Dependencies: 1524 1524
+-- Name: uniquenombre; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY aplicacion
+    ADD CONSTRAINT uniquenombre UNIQUE (nombre);
+
+
+--
+-- TOC entry 1846 (class 2606 OID 23783)
+-- Dependencies: 1524 1524
+-- Name: uniqueruta; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY aplicacion
+    ADD CONSTRAINT uniqueruta UNIQUE (ruta);
+
+
+--
+-- TOC entry 1870 (class 2606 OID 23785)
+-- Dependencies: 1537 1537
+-- Name: users_pk; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY usuario
+    ADD CONSTRAINT users_pk PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1876 (class 2606 OID 23787)
+-- Dependencies: 1541 1541
+-- Name: usuario_unidad_pk; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY usuario_unidad
+    ADD CONSTRAINT usuario_unidad_pk PRIMARY KEY (id);
+
+
+--
+-- TOC entry 1858 (class 1259 OID 23793)
+-- Dependencies: 1533 1533
+-- Name: index_pkperfil; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE UNIQUE INDEX index_pkperfil ON perfil USING btree (id, aplicacion_id);
+
+
+--
+-- TOC entry 1921 (class 0 OID 0)
+-- Dependencies: 1858
+-- Name: INDEX index_pkperfil; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON INDEX index_pkperfil IS 'Indice unico para la restriccion de llave compuesta';
+
+
+--
+-- TOC entry 1872 (class 1259 OID 23794)
+-- Dependencies: 1538 1538
+-- Name: index_usuario_aplicacion; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE UNIQUE INDEX index_usuario_aplicacion ON usuario_aplicacion_perfil USING btree (usuario_id, aplicacion_id);
+
+
+--
+-- TOC entry 1867 (class 1259 OID 23796)
+-- Dependencies: 1535
+-- Name: unidad_idx1; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE UNIQUE INDEX unidad_idx1 ON unidad USING btree (codigo);
+
+
+--
+-- TOC entry 1857 (class 1259 OID 23797)
+-- Dependencies: 1531 1531 1531
+-- Name: unique_opcion_perfil; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE UNIQUE INDEX unique_opcion_perfil ON opcion_perfil USING btree (perfil_id, opcion_id, aplicacion_id);
+
+
+--
+-- TOC entry 1868 (class 1259 OID 23798)
+-- Dependencies: 1537
+-- Name: users_email; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX users_email ON usuario USING btree (email);
+
+
+--
+-- TOC entry 1871 (class 1259 OID 23799)
+-- Dependencies: 1537
+-- Name: users_uniqueid; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX users_uniqueid ON usuario USING btree (uniqueid);
+
+
+--
+-- TOC entry 1880 (class 2606 OID 23801)
+-- Dependencies: 1524 1533 1841
+-- Name: aplicacion_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY perfil
+    ADD CONSTRAINT aplicacion_id FOREIGN KEY (aplicacion_id) REFERENCES aplicacion(id);
+
+
+--
+-- TOC entry 1881 (class 2606 OID 24006)
+-- Dependencies: 1535 1527 1849
+-- Name: fk_unidad_reference_lugar; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY unidad
+    ADD CONSTRAINT fk_unidad_reference_lugar FOREIGN KEY (lugar_id) REFERENCES lugar(id) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+
+--
+-- TOC entry 1882 (class 2606 OID 24011)
+-- Dependencies: 1865 1535 1535
+-- Name: fk_unidad_reference_unidad; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY unidad
+    ADD CONSTRAINT fk_unidad_reference_unidad FOREIGN KEY (nivelsuperior_id) REFERENCES unidad(id) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+
+--
+-- TOC entry 1877 (class 2606 OID 24016)
+-- Dependencies: 1524 1529 1841
+-- Name: fkaplicacion; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY opcion
+    ADD CONSTRAINT fkaplicacion FOREIGN KEY (aplicacion_id) REFERENCES aplicacion(id);
+
+
+--
+-- TOC entry 1878 (class 2606 OID 24021)
+-- Dependencies: 1851 1529 1531
+-- Name: fkopcion; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY opcion_perfil
+    ADD CONSTRAINT fkopcion FOREIGN KEY (opcion_id) REFERENCES opcion(id);
+
+
+--
+-- TOC entry 1879 (class 2606 OID 24026)
+-- Dependencies: 1533 1531 1859 1533 1531
+-- Name: fkperfil; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY opcion_perfil
+    ADD CONSTRAINT fkperfil FOREIGN KEY (perfil_id, aplicacion_id) REFERENCES perfil(id, aplicacion_id);
+
+
+--
+-- TOC entry 1883 (class 2606 OID 24031)
+-- Dependencies: 1533 1533 1859 1538 1538
+-- Name: fkperfil; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY usuario_aplicacion_perfil
+    ADD CONSTRAINT fkperfil FOREIGN KEY (perfil_id, aplicacion_id) REFERENCES perfil(id, aplicacion_id);
+
+
+--
+-- TOC entry 1884 (class 2606 OID 24036)
+-- Dependencies: 1869 1538 1537
+-- Name: fkusuario; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY usuario_aplicacion_perfil
+    ADD CONSTRAINT fkusuario FOREIGN KEY (usuario_id) REFERENCES usuario(id);
+
+
+--
+-- TOC entry 1885 (class 2606 OID 24041)
+-- Dependencies: 1537 1869 1541
+-- Name: fkusuario; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY usuario_unidad
+    ADD CONSTRAINT fkusuario FOREIGN KEY (usuario_id) REFERENCES usuario(id);
+
+
+--
+-- TOC entry 1900 (class 0 OID 0)
+-- Dependencies: 6
+-- Name: public; Type: ACL; Schema: -; Owner: postgres
+--
+
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM postgres;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+
+
+-- Completed on 2010-11-07 20:42:53 BOT
+
+--
+-- PostgreSQL database dump complete
+--
+
